@@ -1,35 +1,40 @@
 import * as Z from "../mod.ts";
-import { run } from "./common.ts";
 
-interface AddEnv {
-  add(a: number, b: number): number;
+class AddingZeroError extends Error {
+  override readonly name = "AddingZeroError";
 }
-
-class AddZeroError extends Error {
-  override readonly name = "AddZero";
-}
-
-export const add = Z.atomf(function(this: AddEnv, a: number, b: number) {
-  if (a === 0 || b === 0) {
-    return new AddZeroError();
-  }
-  return this.add(a, b);
-}, (n) => {
-  console.log(n);
-});
-
-const beAnnoying = Z.atom([], () => {
-  throw 20;
-});
-
-const root = add(1, add(2, add(3, beAnnoying)));
-
-const result = run(root, {
-  add(a, b) {
+function add<A extends Z.$<number>, B extends Z.$<number>>(a: A, b: B) {
+  return Z.call(Z.ls(a, b), ([a, b]) => {
+    if (a === 0 || b === 0) return new AddingZeroError();
     return a + b;
-  },
-});
-
-if (result instanceof Error) {
-  console.log(result.message);
+  });
 }
+
+class SubtractingZeroError extends Error {
+  override readonly name = "SubtractingZeroError";
+}
+export interface SubtractProps {
+  a: number;
+  b: number;
+}
+function subtract<Props extends Z.Rec$<SubtractProps>>(props: Props) {
+  return Z.call(Z.rec(props), ({ a, b }) => {
+    if (b === 0) return new SubtractingZeroError();
+    return a - b;
+  });
+}
+
+const root = add(
+  10,
+  add(
+    2,
+    subtract({
+      a: 3,
+      b: 4,
+    }),
+  ),
+);
+
+const result = await Z.runtime()(root);
+
+console.log(result);

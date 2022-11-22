@@ -10,9 +10,10 @@ await Promise.all([
     entryPoints: ["mod.ts"],
     outDir: OUT_DIR,
     package: {
-      name: "mono",
+      name: "@nvnine/mono",
       version: Deno.args[0] || fail(),
-      description: "A tiny functional effect system",
+      description:
+        "A tiny functional effect system for TypeScript library developers",
       license: "Apache-2.0",
       repository: `github:nvnine/mono`,
     },

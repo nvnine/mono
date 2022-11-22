@@ -1,77 +1,41 @@
-import { Atom } from "./Atom.ts";
-import { EffectLike, isEffectLike } from "./common.ts";
-import { EffectId } from "./Effect.ts";
-import { Name } from "./Name.ts";
-import { UnknownError } from "./UnknownError.ts";
-import { TinyGraph } from "./util.ts";
-import { Work } from "./Work.ts";
+import { E, EffectLike, T, V } from "./Effect.ts";
+import { UntypedError } from "./Error.ts";
+import {
+  EnsureSoleApplies,
+  flattenApplies,
+  PlaceholderApplied,
+} from "./Placeholder.ts";
+import { Process } from "./Process.ts";
 
-export class State {
-  dependents = new TinyGraph<EffectId>();
-
-  relate = (
-    parentId: EffectId,
-    childId: EffectId,
-  ) => {
-    this.dependents.arrow(childId, parentId);
+// TODO: re-think some of the placeholder/applied/misc. naming
+export function runtime<Applies extends PlaceholderApplied[]>(
+  ...applied: EnsureSoleApplies<Applies>
+): Runtime<Applies> {
+  return (root, apply?) => {
+    return new Process({
+      ...flattenApplies(...applied as any),
+      ...apply ? apply(flattenApplies as any) : {},
+    }).init(root)() as any;
   };
 }
 
-export class Context extends Map<EffectId, Work> {
-  constructor(readonly env: unknown) {
-    super();
-  }
-
-  state = (root: EffectLike): State => {
-    const state = new State();
-    const init: [source: EffectLike, parentId?: EffectId][] = [[root]];
-    while (init.length) {
-      const [source, parentId] = init.pop()!;
-      if (source instanceof Name) {
-        init.push([source.root, parentId]);
-        continue;
-      }
-      let work = this.get(source.id);
-      if (!work) {
-        work = source.work(this);
-        this.set(source.id, work);
-      }
-      if (source instanceof Atom) {
-        source.args.forEach((arg) => {
-          if (isEffectLike(arg)) {
-            init.push([arg, source.id]);
-          }
-        });
-      }
-      if (parentId) {
-        state.relate(parentId, source.id);
-      }
-    }
-    return state;
-  };
+export interface Runtime<Applies extends PlaceholderApplied[]> {
+  <Root extends EffectLike>(
+    root: Root,
+    ...[apply]:
+      [Exclude<V<Root>, Applies[number]["placeholder"]["key"]>] extends [never]
+        ? []
+        : [
+          useApplies: UseApplies<
+            V<Root>,
+            Applies[number]["placeholder"]["key"]
+          >,
+        ]
+  ): Promise<E<Root> | UntypedError | T<Root>>;
 }
 
-// TODO: enable hooking into context for rewrites
-export class Runtime extends WeakMap<object, Context> {
-  run = <
-    S extends boolean,
-    V,
-    E extends Error,
-    T,
-  >(
-    root: EffectLike<S, V, E, T>,
-    ...[env]: unknown extends V ? [] : [env: V]
-  ): ColoredResult<S, UnknownError | E | T> => {
-    const key = typeof env === "function" || typeof env === "object" ? env : {};
-    let context = this.get(key);
-    if (!context) {
-      context = new Context(env);
-      this.set(key, context);
-    }
-    const flightPlan = context.state(root);
-    return context.get(root.id)!.enter(flightPlan) as ColoredResult<S, E | T>;
-  };
-}
-
-export type ColoredResult<S extends boolean, R> = false extends S ? Promise<R>
-  : R;
+type UseApplies<V extends PropertyKey, G extends PropertyKey> = (
+  use: <A extends PlaceholderApplied[]>(
+    ...applies: EnsureSoleApplies<A, G>
+  ) => Record<A[number]["placeholder"]["key"], unknown>,
+) => Record<Exclude<V, G>, unknown>;

@@ -1,3 +1,4 @@
+novonine
 nvnine
 atomf
 deno
@@ -7,3 +8,7 @@ esbenp
 evals
 moojok
 sibz
+pendings
+resolveds
+polkadot
+xsync
