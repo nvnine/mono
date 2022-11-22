@@ -1,3 +1,3 @@
 # MONO
 
-Nothing to see here, yet
+> A tiny functional effect system for TypeScript library developers
